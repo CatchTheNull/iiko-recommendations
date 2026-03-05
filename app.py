@@ -1,11 +1,18 @@
+from __future__ import annotations
+
+import datetime
+import hashlib
 import io
 import itertools
+import urllib3
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 
 import pandas as pd
+import requests
 import streamlit as st
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 REQUIRED_FIELDS = [
     "UniqOrderId.Id",
@@ -74,6 +81,67 @@ def parse_iiko_report_xml(xml_bytes: bytes) -> pd.DataFrame:
         "Не смог распарсить XML: не нашёл строки с полями UniqOrderId.Id, DishId, DishName. "
         "Возможен нестандартный формат выгрузки (например Spreadsheet XML)."
     )
+
+
+def auth_iiko(server_url: str, login: str, password: str) -> str:
+    """Аутентификация на iiko Server. Возвращает ключ сессии."""
+    sha1_pass = hashlib.sha1(password.encode()).hexdigest()
+    url = f"{server_url.rstrip('/')}/resto/api/auth"
+    resp = requests.get(url, params={"login": login, "pass": sha1_pass}, verify=False, timeout=30)
+    resp.raise_for_status()
+    key = resp.text.strip()
+    if not key:
+        raise ValueError("Сервер вернул пустой ключ авторизации")
+    return key
+
+
+def fetch_olap(server_url: str, key: str, date_from: str, date_to: str) -> pd.DataFrame:
+    """Загружает данные о продажах через OLAP API iiko и возвращает DataFrame."""
+    url = f"{server_url.rstrip('/')}/resto/api/v2/reports/olap"
+    body = {
+        "reportType": "SALES",
+        "buildSummary": "false",
+        "groupByRowFields": [
+            "UniqOrderId",
+            "DishId",
+            "DishName",
+            "DishGroup.SecondParent",
+        ],
+        "filters": {
+            "OpenDate.Typed": {
+                "filterType": "DateRange",
+                "periodType": "CUSTOM",
+                "from": f"{date_from}T00:00:00.000",
+                "to": f"{date_to}T00:00:00.000",
+                "includeLow": True,
+                "includeHigh": False,
+            },
+            "DeletedWithWriteoff": {
+                "filterType": "IncludeValues",
+                "values": ["NOT_DELETED"],
+            },
+            "OrderDeleted": {
+                "filterType": "IncludeValues",
+                "values": ["NOT_DELETED"],
+            },
+        },
+    }
+    resp = requests.post(
+        url, params={"key": key}, json=body, verify=False, timeout=120
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    # Ответ iiko: {"columnNames": [...], "data": [[...], [...]]}
+    columns = data.get("columnNames", [])
+    rows = data.get("data", [])
+    df = pd.DataFrame(rows, columns=columns)
+
+    # UniqOrderId → UniqOrderId.Id (как ожидает build_recommendations)
+    if "UniqOrderId" in df.columns and "UniqOrderId.Id" not in df.columns:
+        df = df.rename(columns={"UniqOrderId": "UniqOrderId.Id"})
+
+    return df
 
 
 def build_recommendations(
@@ -184,8 +252,10 @@ def build_recommendations(
     return wide_df, long_df
 
 
+# ─── UI ───────────────────────────────────────────────────────────────────────
+
 st.set_page_config(page_title="iiko Recommendations", layout="wide")
-st.title("iiko: рекомендации “берут вместе” из XML")
+st.title("iiko: рекомендации «берут вместе»")
 
 with st.sidebar:
     st.header("Настройки")
@@ -197,27 +267,80 @@ with st.sidebar:
     excluded_text = st.text_area("Категории для исключения (по одной в строке)", value="\n".join(excluded_default))
     excluded_categories = {x.strip() for x in excluded_text.splitlines() if x.strip()}
 
-uploaded = st.file_uploader("Загрузи XML выгрузку iiko (REPORT_*.xml)", type=["xml"])
+# Вкладки для двух режимов загрузки данных
+tab_api, tab_xml = st.tabs(["🔌 iiko Server", "📂 XML файл"])
 
-if not uploaded:
-    st.info("Загрузи XML — и я построю таблицу рекомендаций + дам CSV.")
+with tab_api:
+    st.subheader("Подключение к iiko Server")
+
+    server_url = st.text_input(
+        "URL сервера",
+        placeholder="https://hostname:443",
+        key="server_url",
+    )
+
+    col_l, col_p = st.columns(2)
+    with col_l:
+        login = st.text_input("Логин", key="login")
+    with col_p:
+        password = st.text_input("Пароль", type="password", key="password")
+
+    col_f, col_t = st.columns(2)
+    with col_f:
+        date_from = st.date_input(
+            "Дата с",
+            value=datetime.date.today() - datetime.timedelta(days=30),
+            key="date_from",
+        )
+    with col_t:
+        date_to = st.date_input(
+            "Дата по",
+            value=datetime.date.today(),
+            key="date_to",
+        )
+
+    if st.button("Загрузить данные с сервера", type="primary"):
+        if not server_url or not login or not password:
+            st.error("Заполни URL сервера, логин и пароль.")
+        else:
+            try:
+                with st.spinner("Аутентификация..."):
+                    key = auth_iiko(server_url, login, password)
+                with st.spinner(f"Загрузка данных за {date_from} – {date_to}..."):
+                    df_loaded = fetch_olap(server_url, key, str(date_from), str(date_to))
+                st.session_state["df_raw"] = df_loaded
+                st.success(f"Получено строк: {len(df_loaded):,}")
+            except requests.exceptions.HTTPError as e:
+                st.error(f"Ошибка HTTP {e.response.status_code}: {e.response.text[:300]}")
+            except requests.exceptions.ConnectionError:
+                st.error("Не удалось подключиться к серверу. Проверь URL.")
+            except Exception as e:
+                st.error(str(e))
+
+with tab_xml:
+    st.subheader("Загрузка XML-выгрузки")
+    uploaded = st.file_uploader("Загрузи XML выгрузку iiko (REPORT_*.xml)", type=["xml"])
+    if uploaded:
+        try:
+            df_loaded = parse_iiko_report_xml(uploaded.read())
+            st.session_state["df_raw"] = df_loaded
+            st.success(f"Распарсил строк: {len(df_loaded):,}")
+        except Exception as e:
+            st.error(str(e))
+
+# ─── Общий пайплайн рекомендаций ─────────────────────────────────────────────
+
+if "df_raw" not in st.session_state:
+    st.info("Подключись к iiko Server или загрузи XML — и я построю таблицу рекомендаций + дам CSV.")
     st.stop()
 
-xml_bytes = uploaded.read()
-
-try:
-    df_raw = parse_iiko_report_xml(xml_bytes)
-except Exception as e:
-    st.error(str(e))
-    st.stop()
-
-st.success(f"Распарсил строки: {len(df_raw):,}")
+df_raw = st.session_state["df_raw"]
 
 wide_df, long_df = build_recommendations(
-    df_raw,
+    df_raw.copy(),
     top_n=int(top_n),
     min_co=int(min_co),
-    excluded_categories=excluded_categories
+    excluded_categories=excluded_categories,
 )
 
 if long_df.empty:
@@ -243,16 +366,17 @@ if cat != "(Все)":
 st.subheader("Таблица рекомендаций (блюдо → список)")
 st.dataframe(filtered.head(int(limit)), use_container_width=True)
 
-# CSV export (long format is best for downstream)
-csv_df = long_df.copy()
+# CSV export
 csv_buf = io.StringIO()
-csv_df.to_csv(csv_buf, index=False)
+long_df.to_csv(csv_buf, index=False)
+filename = f"recommendations_{datetime.date.today()}.csv"
 st.download_button(
-    label="⬇️ Скачать CSV (dish -> recommended dish)",
+    label="⬇️ Скачать CSV для техподдержки",
     data=csv_buf.getvalue().encode("utf-8"),
-    file_name="recommendations.csv",
-    mime="text/csv"
+    file_name=filename,
+    mime="text/csv",
+    type="primary",
 )
 
 with st.expander("Показать CSV-формат (первые 200 строк)"):
-    st.dataframe(csv_df.head(200), use_container_width=True)
+    st.dataframe(long_df.head(200), use_container_width=True)
