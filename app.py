@@ -332,6 +332,31 @@ if "df_raw" not in st.session_state:
 
 df_raw = st.session_state["df_raw"]
 
+# ── Диагностика загруженных данных ──
+with st.expander("🔍 Диагностика загруженных данных", expanded=False):
+    st.write(f"**Строк:** {len(df_raw):,} | **Колонки:** `{list(df_raw.columns)}`")
+    st.dataframe(df_raw.head(10), use_container_width=True)
+
+    # Считаем сколько уникальных заказов и сколько из них с 2+ блюдами
+    order_col = "UniqOrderId.Id" if "UniqOrderId.Id" in df_raw.columns else None
+    dish_col = "DishId" if "DishId" in df_raw.columns else None
+    if order_col and dish_col:
+        orders_per_dish_count = df_raw.groupby(order_col)[dish_col].nunique()
+        total_orders = len(orders_per_dish_count)
+        multi_dish_orders = (orders_per_dish_count >= 2).sum()
+        st.write(f"**Уникальных заказов:** {total_orders:,}")
+        st.write(f"**Заказов с 2+ разными блюдами:** {multi_dish_orders:,}")
+        if multi_dish_orders == 0:
+            st.error("Нет ни одного заказа с 2+ блюдами — co-occurrence невозможен.")
+    else:
+        missing = [f for f in ["UniqOrderId.Id", "DishId"] if f not in df_raw.columns]
+        st.error(f"Не найдены ожидаемые колонки: {missing}. iiko вернул другие имена.")
+
+    if "DishGroup.SecondParent" in df_raw.columns:
+        cats = df_raw["DishGroup.SecondParent"].value_counts().head(20)
+        st.write("**Топ категорий в данных:**")
+        st.dataframe(cats.rename("кол-во строк"), use_container_width=True)
+
 wide_df, long_df = build_recommendations(
     df_raw.copy(),
     top_n=int(top_n),
@@ -341,6 +366,7 @@ wide_df, long_df = build_recommendations(
 
 if long_df.empty:
     st.warning("По текущим настройкам рекомендаций не получилось (нет совместных продаж или всё отфильтровано).")
+    st.info("Разверни блок «Диагностика» выше, чтобы понять причину.")
     st.stop()
 
 # Filters UI
