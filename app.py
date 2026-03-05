@@ -102,7 +102,7 @@ def fetch_olap(server_url: str, key: str, date_from: str, date_to: str) -> pd.Da
         "reportType": "SALES",
         "buildSummary": "false",
         "groupByRowFields": [
-            "UniqOrderId",
+            "UniqOrderId.Id",
             "DishId",
             "DishName",
             "DishGroup.SecondParent",
@@ -136,10 +136,6 @@ def fetch_olap(server_url: str, key: str, date_from: str, date_to: str) -> pd.Da
     columns = data.get("columnNames", [])
     rows = data.get("data", [])
     df = pd.DataFrame(rows, columns=columns)
-
-    # UniqOrderId → UniqOrderId.Id (как ожидает build_recommendations)
-    if "UniqOrderId" in df.columns and "UniqOrderId.Id" not in df.columns:
-        df = df.rename(columns={"UniqOrderId": "UniqOrderId.Id"})
 
     return df
 
