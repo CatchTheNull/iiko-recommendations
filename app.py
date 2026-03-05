@@ -105,7 +105,7 @@ def fetch_olap(server_url: str, key: str, date_from: str, date_to: str) -> pd.Da
             "UniqOrderId.Id",
             "DishId",
             "DishName",
-            "DishGroup.SecondParent",
+            "DishCategory",
         ],
         "filters": {
             "OpenDate.Typed": {
@@ -126,16 +126,36 @@ def fetch_olap(server_url: str, key: str, date_from: str, date_to: str) -> pd.Da
             },
         },
     }
+    # Ключ передаём и в query param и в cookie — как в рабочем curl
     resp = requests.post(
-        url, params={"key": key}, json=body, verify=False, timeout=120
+        url, params={"key": key}, cookies={"key": key},
+        json=body, verify=False, timeout=120,
     )
     resp.raise_for_status()
     data = resp.json()
 
-    # Ответ iiko: {"columnNames": [...], "data": [[...], [...]]}
-    columns = data.get("columnNames", [])
     rows = data.get("data", [])
-    df = pd.DataFrame(rows, columns=columns)
+    if not rows:
+        return pd.DataFrame()
+
+    # Сервер может вернуть либо список объектов {"field": value, ...}
+    # либо {"columnNames": [...], "data": [[...], [...]]}
+    if isinstance(rows[0], dict):
+        df = pd.DataFrame(rows)
+    else:
+        columns = data.get("columnNames", [])
+        df = pd.DataFrame(rows, columns=columns)
+
+    # Нормализуем имена колонок к тому, что ожидает build_recommendations
+    rename_map: dict[str, str] = {}
+    # DishCategory → DishGroup.SecondParent
+    if "DishCategory" in df.columns and "DishGroup.SecondParent" not in df.columns:
+        rename_map["DishCategory"] = "DishGroup.SecondParent"
+    # Если DishId отсутствует — используем DishName как идентификатор
+    if "DishId" not in df.columns and "DishName" in df.columns:
+        df["DishId"] = df["DishName"]
+    if rename_map:
+        df = df.rename(columns=rename_map)
 
     return df
 
