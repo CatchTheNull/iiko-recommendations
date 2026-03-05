@@ -279,8 +279,7 @@ with st.sidebar:
     min_co = st.number_input("Мин. совместных покупок (co-occurrence)", min_value=1, value=1, step=1)
 
     st.caption("Исключения (обычно модификаторы):")
-    excluded_default = ["OD Модификаторы", "GHD Модификаторы"]
-    excluded_text = st.text_area("Категории для исключения (по одной в строке)", value="\n".join(excluded_default))
+    excluded_text = st.text_area("Категории для исключения (по одной в строке)", value="")
     excluded_categories = {x.strip() for x in excluded_text.splitlines() if x.strip()}
 
 # Вкладки для двух режимов загрузки данных
