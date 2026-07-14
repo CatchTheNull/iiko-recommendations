@@ -5,6 +5,7 @@ import hashlib
 import io
 import itertools
 import json
+import os
 import urllib3
 import xml.etree.ElementTree as ET
 from collections import defaultdict
@@ -165,16 +166,40 @@ def fetch_olap(server_url: str, key: str, date_from: str, date_to: str) -> pd.Da
 
 IIKO_TRANSPORT_BASE = "https://api-ru.iiko.services"
 
+# Константы приложения для v2-авторизации (одинаковы для всех запросов).
+# По умолчанию берутся отсюда; при желании их можно спрятать в переменные
+# окружения / HF Secrets IIKO_APP_ID и IIKO_CLIENT_SECRET.
+IIKO_TRANSPORT_APP_ID = os.environ.get(
+    "IIKO_APP_ID", "0490666c-0a38-4744-b2f7-e81ed047c366"
+)
+IIKO_TRANSPORT_CLIENT_SECRET = os.environ.get(
+    "IIKO_CLIENT_SECRET", "P0I4gYuedJMCtdlcZQPRllpNnSzjwfgN7MM8hFSIK4g="
+)
 
-def iiko_transport_token(api_login: str) -> str:
-    """POST /api/1/access_token — получение Bearer-токена iikoTransport."""
-    url = f"{IIKO_TRANSPORT_BASE}/api/1/access_token"
-    resp = requests.post(url, json={"apiLogin": api_login}, timeout=30)
+
+def iiko_transport_token(api_key: str) -> str:
+    """POST /api/v2/access_token — получение Bearer-токена iikoTransport.
+
+    В форме вводится apiKey; appId и clientSecret — константы приложения.
+    """
+    url = f"{IIKO_TRANSPORT_BASE}/api/v2/access_token"
+    body = {
+        "apiKey": api_key,
+        "appId": IIKO_TRANSPORT_APP_ID,
+        "clientSecret": IIKO_TRANSPORT_CLIENT_SECRET,
+    }
+    resp = requests.post(url, json=body, timeout=30)
     resp.raise_for_status()
     data = resp.json()
-    token = data.get("token", "")
+    # v2 может отдавать token / access_token / accessToken — берём что есть.
+    token = (
+        data.get("token")
+        or data.get("access_token")
+        or data.get("accessToken")
+        or ""
+    )
     if not token:
-        raise ValueError("iikoTransport вернул пустой токен")
+        raise ValueError(f"iikoTransport вернул пустой токен. Ответ: {str(data)[:300]}")
     return token
 
 
@@ -473,7 +498,7 @@ with tab_combined:
     st.markdown("#### 2. Внешнее меню (iikoTransport)")
 
     api_login = st.text_input(
-        "API-ключ iikoTransport (apiLogin)",
+        "API-ключ iikoTransport (apiKey)",
         type="password",
         key="c_transport_api_login",
         placeholder="37ac8a1d7eb9446281c4934c0ba8f3f3",
