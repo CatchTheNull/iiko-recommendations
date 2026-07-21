@@ -32,7 +32,7 @@ SESSION_COOKIE_HTTPONLY = True
 # Учётные данные для входа в приложение (авторизация при первом входе).
 # В проде обязательно переопредели через переменные окружения!
 APP_LOGIN = os.environ.get("APP_LOGIN", "admin")
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "admin")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "resto#test2026")
 
 ROOT_URLCONF = "config.urls"
 

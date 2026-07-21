@@ -134,7 +134,7 @@ curl -X POST "http://localhost:8000/api/recommendations/from-files?format=csv" \
 ## Переменные окружения
 
 - `APP_LOGIN`, `APP_PASSWORD` — учётные данные для входа в приложение
-  (по умолчанию `admin`/`admin` — обязательно смени в проде)
+  (значения по умолчанию заданы в `backend/config/settings.py`)
 - `DJANGO_SECRET_KEY` — обязательно задать в проде (им подписываются сессионные cookie)
 - `DJANGO_DEBUG` — `0` в проде (по умолчанию `1`)
 - `DJANGO_ALLOWED_HOSTS` — список хостов через запятую (по умолчанию `*`)
