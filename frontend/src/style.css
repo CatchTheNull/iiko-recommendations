@@ -1,0 +1,405 @@
+/* Неоморфизм: единый светлый фон, «выпуклые» панели и «вдавленные» поля
+   за счёт двойных теней (светлая сверху-слева, тёмная снизу-справа). */
+
+:root {
+  --bg: #eceef1;
+  --text: #3a4150;
+  --muted: #8a92a3;
+  --accent: #e2492f;
+  --accent-hover: #c93d26;
+
+  --shadow-dark: #d1d5db;
+  --shadow-light: #ffffff;
+
+  /* Выпуклая поверхность */
+  --raised: 8px 8px 18px var(--shadow-dark), -8px -8px 18px var(--shadow-light);
+  --raised-sm: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light);
+  /* Вдавленная поверхность */
+  --inset: inset 4px 4px 9px var(--shadow-dark), inset -4px -4px 9px var(--shadow-light);
+  --inset-sm: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+
+  --success-text: #2f9e63;
+  --error-text: #cc4532;
+  --info-text: #4a7cd6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  min-height: 100vh;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 24px;
+  margin: 0 0 4px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 17px;
+  margin: 0 0 14px;
+}
+
+h3 {
+  font-size: 15px;
+  margin: 16px 0 8px;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 10px 20px;
+  color: var(--muted);
+}
+
+.logout-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.logout-btn:hover {
+  color: var(--accent);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 28px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 28px 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Выпуклая панель — того же цвета, что и фон */
+.panel {
+  background: var(--bg);
+  border: none;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: var(--raised);
+}
+
+.sidebar {
+  position: sticky;
+  top: 24px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 14px 0 6px;
+}
+
+/* Поля ввода — «вдавленные» */
+input[type='text'],
+input[type='password'],
+input[type='number'],
+input[type='date'],
+select,
+textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--inset);
+  appearance: none;
+}
+
+select {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a92a3' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 34px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #b3b9c6;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  box-shadow: var(--inset), 0 0 0 2px rgba(226, 73, 47, 0.25);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+/* Кнопки — выпуклые, при нажатии «вдавливаются» */
+button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: var(--raised-sm);
+  transition: box-shadow 0.15s ease, color 0.15s ease;
+}
+
+button:hover {
+  color: var(--accent);
+}
+
+button:active {
+  box-shadow: var(--inset-sm);
+}
+
+button.primary {
+  background: linear-gradient(145deg, #ef5638, var(--accent-hover));
+  color: #fff;
+  box-shadow:
+    6px 6px 14px var(--shadow-dark),
+    -6px -6px 14px var(--shadow-light),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.3);
+}
+
+button.primary:hover {
+  color: #fff;
+  filter: brightness(1.05);
+}
+
+button.primary:active {
+  box-shadow: var(--inset-sm);
+  filter: brightness(0.95);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Чекбоксы */
+input[type='checkbox'] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: var(--bg);
+  box-shadow: var(--inset-sm);
+  cursor: pointer;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.row {
+  display: flex;
+  gap: 14px;
+}
+
+.row > * {
+  flex: 1;
+}
+
+/* Вкладки — «вдавленная» дорожка с выпуклой активной пилюлей */
+.tabs {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  border: none;
+  padding: 6px;
+  border-radius: 14px;
+  box-shadow: var(--inset-sm);
+}
+
+.tabs button {
+  border-radius: 10px;
+  box-shadow: none;
+  background: transparent;
+  padding: 8px 14px;
+  color: var(--muted);
+}
+
+.tabs button:active {
+  box-shadow: none;
+}
+
+.tabs button.active {
+  color: var(--accent);
+  background: var(--bg);
+  box-shadow: var(--raised-sm);
+}
+
+/* Сообщения — мягкие вдавленные плашки */
+.alert {
+  padding: 11px 16px;
+  border-radius: 12px;
+  margin: 14px 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg);
+  box-shadow: var(--inset-sm);
+}
+
+.alert.success {
+  color: var(--success-text);
+}
+
+.alert.error {
+  color: var(--error-text);
+}
+
+.alert.info {
+  color: var(--info-text);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(138, 146, 163, 0.15);
+  vertical-align: top;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  box-shadow: 0 1px 0 rgba(138, 146, 163, 0.2);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  max-height: 65vh;
+  overflow-y: auto;
+  border: none;
+  border-radius: 14px;
+  box-shadow: var(--inset-sm);
+  padding: 4px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+
+button:not(.primary) .spinner {
+  border-color: rgba(0, 0, 0, 0.12);
+  border-top-color: var(--muted);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+details {
+  margin: 14px 0;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.divider {
+  border: none;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--bg);
+  box-shadow: inset 1px 1px 2px var(--shadow-dark), inset -1px -1px 2px var(--shadow-light);
+  margin: 20px 0;
+}
+
+input[type='file'] {
+  font-size: 13px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: var(--inset-sm);
+}
+
+input[type='file']::file-selector-button {
+  border: none;
+  border-radius: 9px;
+  padding: 7px 14px;
+  margin-right: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: var(--raised-sm);
+}
+
+input[type='file']::file-selector-button:active {
+  box-shadow: var(--inset-sm);
+}
